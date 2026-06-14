@@ -44,12 +44,21 @@ export default function App() {
     try { return JSON.parse(localStorage.getItem('tm_tasks') || '{}'); }
     catch { return {}; }
   });
+  const [statusTasks, setStatusTasks] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('tm_status_tasks') || '{}'); }
+    catch { return {}; }
+  });
   const [selectedDate, setSelectedDate] = useState(null);
   const [modalOpen, setModalOpen] = useState(false);
+  const [showStatusModal, setShowStatusModal] = useState(null);
 
   useEffect(() => {
     localStorage.setItem('tm_tasks', JSON.stringify(tasks));
   }, [tasks]);
+
+  useEffect(() => {
+    localStorage.setItem('tm_status_tasks', JSON.stringify(statusTasks));
+  }, [statusTasks]);
 
   const daysInMonth = getDaysInMonth(currentYear, currentMonth);
   const firstDay = getFirstDay(currentYear, currentMonth);
@@ -69,22 +78,35 @@ export default function App() {
   };
 
   const addTask = (dateKey, title) => {
-    const newTask = { id: Date.now(), title, status: 'new', note: '' };
+    const newTask = { id: Date.now(), title, status: 'new', note: '', createdAt: new Date().toISOString(), dateKey };
     setTasks(prev => ({ ...prev, [dateKey]: [...(prev[dateKey] || []), newTask] }));
+    setStatusTasks(st => ({ ...st, new: [...(st.new || []), newTask] }));
   };
 
   const updateTask = (dateKey, taskId, updates) => {
-    setTasks(prev => ({
-      ...prev,
-      [dateKey]: prev[dateKey].map(t => t.id === taskId ? { ...t, ...updates } : t),
-    }));
+    setTasks(prev => {
+      const updated = prev[dateKey].map(t => {
+        if (t.id !== taskId) return t;
+        const newStatus = updates.status || t.status;
+        const completedAt = newStatus === 'completed' && t.status !== 'completed' ? new Date().toISOString() : t.completedAt;
+        const updatedTask = { ...t, ...updates, completedAt };
+        setStatusTasks(st => {
+          const oldList = (st[t.status] || []).filter(x => x.id !== taskId);
+          const newList = [...(st[newStatus] || []).filter(x => x.id !== taskId), updatedTask];
+          return { ...st, [t.status]: oldList, [newStatus]: newList };
+        });
+        return updatedTask;
+      });
+      return { ...prev, [dateKey]: updated };
+    });
   };
 
   const deleteTask = (dateKey, taskId) => {
-    setTasks(prev => ({
-      ...prev,
-      [dateKey]: prev[dateKey].filter(t => t.id !== taskId),
-    }));
+    setTasks(prev => {
+      const task = (prev[dateKey] || []).find(t => t.id === taskId);
+      if (task) setStatusTasks(st => ({ ...st, [task.status]: (st[task.status] || []).filter(x => x.id !== taskId) }));
+      return { ...prev, [dateKey]: prev[dateKey].filter(t => t.id !== taskId) };
+    });
   };
 
   const getStatusSummary = (dateKey) => {
@@ -107,6 +129,19 @@ export default function App() {
       <header className="app-header">
         <h1>📋 Task Manager</h1>
         <p className="subtitle">Your learning & work tracker</p>
+        <div className="status-view-btns">
+          {Object.entries(STATUS_CONFIG).map(([key, val]) => (
+            <button
+              key={key}
+              className="status-view-btn"
+              style={{ background: val.color }}
+              onClick={() => setShowStatusModal(key)}
+            >
+              {val.emoji} {val.label}
+              <span className="completed-badge">{(statusTasks[key] || []).length}</span>
+            </button>
+          ))}
+        </div>
       </header>
 
       <div className="calendar-container">
@@ -169,6 +204,97 @@ export default function App() {
           onDelete={deleteTask}
         />
       )}
+
+      {showStatusModal && (
+        <StatusModal
+          status={showStatusModal}
+          tasks={statusTasks[showStatusModal] || []}
+          onClose={() => setShowStatusModal(null)}
+        />
+      )}
+    </div>
+  );
+}
+
+function StatusModal({ status, tasks, onClose }) {
+  const cfg = STATUS_CONFIG[status];
+  const fmt = (iso) => iso ? new Date(iso).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' }) : '—';
+
+  const grouped = tasks.reduce((acc, t) => {
+    const key = t.dateKey || '—';
+    if (!acc[key]) acc[key] = [];
+    acc[key].push(t);
+    return acc;
+  }, {});
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal completed-modal" onClick={e => e.stopPropagation()}>
+        <div className="modal-header">
+          <h3>{cfg.emoji} {cfg.label} Tasks ({tasks.length})</h3>
+          <button className="close-btn" onClick={onClose}>✕</button>
+        </div>
+        {tasks.length === 0 ? (
+          <p className="no-tasks">No {cfg.label.toLowerCase()} tasks yet!</p>
+        ) : (
+          Object.entries(grouped).sort(([a], [b]) => b.localeCompare(a)).map(([dateKey, items]) => (
+            <div key={dateKey} className="completed-group">
+              <div className="completed-group-date" style={{ color: cfg.color }}>📅 {dateKey}</div>
+              {items.map(task => (
+                <div key={task.id} className="completed-item" style={{ background: cfg.color + '18', borderColor: cfg.color + '55' }}>
+                  <div className="completed-title" style={{ color: cfg.color }}>{cfg.emoji} {task.title}</div>
+                  {task.note && <div className="completed-note">📝 {task.note}</div>}
+                  <div className="completed-dates">
+                    <span>🕐 Created: {fmt(task.createdAt)}</span>
+                    {task.completedAt && <span>🏁 Completed: {fmt(task.completedAt)}</span>}
+                  </div>
+                </div>
+              ))}
+            </div>
+          ))
+        )}
+      </div>
+    </div>
+  );
+}
+
+function CompletedModal({ tasks, onClose }) {
+  const fmt = (iso) => iso ? new Date(iso).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' }) : '—';
+
+  const grouped = tasks.reduce((acc, t) => {
+    const key = t.dateKey || '—';
+    if (!acc[key]) acc[key] = [];
+    acc[key].push(t);
+    return acc;
+  }, {});
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal completed-modal" onClick={e => e.stopPropagation()}>
+        <div className="modal-header">
+          <h3>✅ Completed Tasks ({tasks.length})</h3>
+          <button className="close-btn" onClick={onClose}>✕</button>
+        </div>
+        {tasks.length === 0 ? (
+          <p className="no-tasks">No completed tasks yet!</p>
+        ) : (
+          Object.entries(grouped).sort(([a], [b]) => b.localeCompare(a)).map(([dateKey, items]) => (
+            <div key={dateKey} className="completed-group">
+              <div className="completed-group-date">📅 {dateKey}</div>
+              {items.map(task => (
+                <div key={task.id} className="completed-item">
+                  <div className="completed-title">✅ {task.title}</div>
+                  {task.note && <div className="completed-note">📝 {task.note}</div>}
+                  <div className="completed-dates">
+                    <span>🕐 Created: {fmt(task.createdAt)}</span>
+                    <span>🏁 Completed: {fmt(task.completedAt)}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ))
+        )}
+      </div>
     </div>
   );
 }

@@ -363,3 +363,83 @@ body {
   .modal { padding: 20px; }
   .status-btn { font-size: 0.7rem; padding: 3px 7px; }
 }
+
+/* Status View Buttons */
+.status-view-btns {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+  margin-top: 14px;
+}
+
+.status-view-btn {
+  padding: 7px 16px;
+  color: white;
+  border: none;
+  border-radius: 24px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: opacity 0.2s, transform 0.2s;
+  opacity: 0.9;
+}
+
+.status-view-btn:hover { opacity: 1; transform: translateY(-1px); }
+
+.completed-badge {
+  background: rgba(255,255,255,0.3);
+  border-radius: 12px;
+  padding: 1px 8px;
+  font-size: 0.82rem;
+}
+
+/* Completed Modal */
+.completed-modal { max-width: 620px; }
+
+.completed-group {
+  margin-bottom: 18px;
+}
+
+.completed-group-date {
+  font-weight: 700;
+  font-size: 0.85rem;
+  color: #667eea;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 8px;
+  padding-bottom: 4px;
+  border-bottom: 2px solid #eef0ff;
+}
+
+.completed-item {
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  border-radius: 10px;
+  padding: 12px 14px;
+  margin-bottom: 8px;
+}
+
+.completed-title {
+  font-weight: 600;
+  font-size: 0.95rem;
+  color: #166534;
+  margin-bottom: 4px;
+}
+
+.completed-note {
+  font-size: 0.82rem;
+  color: #555;
+  margin-bottom: 6px;
+}
+
+.completed-dates {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  font-size: 0.78rem;
+  color: #888;
+}
